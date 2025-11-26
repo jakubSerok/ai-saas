@@ -3,7 +3,18 @@ import { v2 as cloudinary } from "cloudinary";
 import { auth } from "@clerk/nextjs/server";
 import { PrismaClient } from "@prisma/client";
 
-const prisma = new PrismaClient();
+// This prevents the route from being evaluated during build time
+export const dynamic = "force-dynamic";
+
+let prisma: PrismaClient;
+
+// Initialize Prisma client lazily
+function getPrismaClient() {
+  if (!prisma) {
+    prisma = new PrismaClient();
+  }
+  return prisma;
+}
 
 // Configuration
 cloudinary.config({
@@ -63,7 +74,7 @@ export async function POST(request: NextRequest) {
         uploadStream.end(buffer);
       }
     );
-    const video = await prisma.video.create({
+    const video = await getPrismaClient().video.create({
       data: {
         title,
         description,
@@ -80,6 +91,7 @@ export async function POST(request: NextRequest) {
       error instanceof Error ? error.message : "Failed to upload video";
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   } finally {
-    await prisma.$disconnect();
+    // Don't disconnect on every request in production
+    // This will be handled by the app lifecycle
   }
 }
